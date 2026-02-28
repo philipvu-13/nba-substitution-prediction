@@ -1,0 +1,61 @@
+[2026-02-22 15:38:02] === BACKFILL START season=2025-26 force=False max_games=None ===
+[2026-02-22 15:38:02] Ensuring raw table exists: play_by_play_v3_raw ...
+[2026-02-22 15:38:02] Ensuring games are loaded for season=2025-26 ...
+[2026-02-22 15:38:02] Games load step complete for season=2025-26.
+[2026-02-22 15:38:02] Found 63 games to consider (season=like(%2025%)).
+[2026-02-22 15:38:02] [1/63] game_id=0012500028
+[2026-02-22 15:38:04]   -> fetched 449 events from API.
+[2026-02-22 15:38:04]   -> FAIL: InvalidColumnReference('there is no unique or exclusion constraint matching the ON CONFLICT specification\n')
+[2026-02-22 15:38:04] Traceback (most recent call last):
+  File "c:\Users\phili\Desktop\nba-substitution-prediction\src\collect\backfill_season.py", line 189, in backfill_season
+    attempted = pbp.insert_raw_play_by_play(df)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\phili\Desktop\nba-substitution-prediction\src\collect\get_play_by_play.py", line 257, in insert_raw_play_by_play
+    psycopg2.extras.execute_values(
+  File "C:\Users\phili\Desktop\nba-substitution-prediction\venv\Lib\site-packages\psycopg2\extras.py", line 1299, in execute_values
+    cur.execute(b''.join(parts))
+psycopg2.errors.InvalidColumnReference: there is no unique or exclusion constraint matching the ON CONFLICT specification
+
+
+[2026-02-22 15:38:10] [2/63] game_id=0012500036
+[2026-02-22 15:38:12]   -> fetched 590 events from API.
+[2026-02-22 15:38:12]   -> FAIL: InvalidColumnReference('there is no unique or exclusion constraint matching the ON CONFLICT specification\n')
+[2026-02-22 15:38:12] Traceback (most recent call last):
+  File "c:\Users\phili\Desktop\nba-substitution-prediction\src\collect\backfill_season.py", line 189, in backfill_season
+    attempted = pbp.insert_raw_play_by_play(df)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\phili\Desktop\nba-substitution-prediction\src\collect\get_play_by_play.py", line 257, in insert_raw_play_by_play
+    psycopg2.extras.execute_values(
+  File "C:\Users\phili\Desktop\nba-substitution-prediction\venv\Lib\site-packages\psycopg2\extras.py", line 1299, in execute_values
+    cur.execute(b''.join(parts))
+psycopg2.errors.InvalidColumnReference: there is no unique or exclusion constraint matching the ON CONFLICT specification
+
+
+[2026-02-22 15:38:19] [3/63] game_id=0012500039
+[2026-02-22 15:38:20]   -> fetched 539 events from API.
+[2026-02-22 15:38:20]   -> FAIL: InvalidColumnReference('there is no unique or exclusion constraint matching the ON CONFLICT specification\n')
+[2026-02-22 15:38:20] Traceback (most recent call last):
+  File "c:\Users\phili\Desktop\nba-substitution-prediction\src\collect\backfill_season.py", line 189, in backfill_season
+    attempted = pbp.insert_raw_play_by_play(df)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\phili\Desktop\nba-substitution-prediction\src\collect\get_play_by_play.py", line 257, in insert_raw_play_by_play
+    psycopg2.extras.execute_values(
+  File "C:\Users\phili\Desktop\nba-substitution-prediction\venv\Lib\site-packages\psycopg2\extras.py", line 1299, in execute_values
+    cur.execute(b''.join(parts))
+psycopg2.errors.InvalidColumnReference: there is no unique or exclusion constraint matching the ON CONFLICT specification
+
+
+[2026-02-22 15:38:25] [4/63] game_id=0012500055
+[2026-02-22 15:38:27]   -> fetched 466 events from API.
+[2026-02-22 15:38:27]   -> FAIL: InvalidColumnReference('there is no unique or exclusion constraint matching the ON CONFLICT specification\n')
+[2026-02-22 15:38:27] Traceback (most recent call last):
+  File "c:\Users\phili\Desktop\nba-substitution-prediction\src\collect\backfill_season.py", line 189, in backfill_season
+    attempted = pbp.insert_raw_play_by_play(df)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\phili\Desktop\nba-substitution-prediction\src\collect\get_play_by_play.py", line 257, in insert_raw_play_by_play
+    psycopg2.extras.execute_values(
+  File "C:\Users\phili\Desktop\nba-substitution-prediction\venv\Lib\site-packages\psycopg2\extras.py", line 1299, in execute_values
+    cur.execute(b''.join(parts))
+psycopg2.errors.InvalidColumnReference: there is no unique or exclusion constraint matching the ON CONFLICT specification
+
+
