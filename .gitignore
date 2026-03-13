@@ -7,4 +7,5 @@ data/processed/
 *.db
 logs/
 *.log
-*.cache
+cache/
+.cache/
