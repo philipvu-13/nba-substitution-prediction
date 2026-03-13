@@ -6,4 +6,5 @@ data/processed/
 *.csv
 *.db
 logs/
+*.log
 *.cache
