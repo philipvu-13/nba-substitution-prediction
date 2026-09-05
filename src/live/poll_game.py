@@ -110,6 +110,7 @@ def process_alert(
     alert_memory.record_alert(
         player_id,
         game_second,
+        alert_status,
     )
 
     return alert_status
@@ -197,7 +198,11 @@ def poll_game(
         )
 
     model_artifact = joblib.load(MODEL_PATH)
-    alert_memory = AlertMemory()
+
+    alert_memory = AlertMemory(
+        game_id=game_id
+    )
+
     previous_state_key = None
 
     print(f"Watching game {game_id}")
@@ -212,6 +217,7 @@ def poll_game(
     )
 
     print("PostgreSQL storage: enabled")
+    print("Persistent alert cooldowns: enabled")
     print("Press Ctrl+C to stop.\n")
 
     try:
@@ -323,9 +329,10 @@ def main():
         )
 
     model_artifact = joblib.load(MODEL_PATH)
-    alert_memory = AlertMemory()
 
     if args.period is not None:
+        alert_memory = AlertMemory()
+
         run_once(
             args.game_id,
             model_artifact,
