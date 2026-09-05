@@ -1,4 +1,5 @@
 from pathlib import Path
+import pandas as pd
 
 import joblib
 from sklearn.metrics import (
@@ -157,7 +158,23 @@ def main():
     print(f"\nSelected threshold: {threshold:.2f}")
     print(f"Validation F1: {validation_f1:.4f}")
 
-    metrics = evaluate(model, testing, threshold)
+    final_training = pd.concat(
+        [training, validation],
+       ignore_index=True,
+    )
+
+    final_model = build_full_model()
+
+    final_model.fit(
+        final_training[FEATURES],
+        final_training[TARGET],
+    )
+
+    metrics = evaluate(
+        final_model,
+        testing,
+        threshold,
+    )
 
     print("\nFinal test metrics")
 
@@ -168,12 +185,12 @@ def main():
 
     joblib.dump(
         {
-            "model": model,
+            "model": final_model,
             "features": FEATURES,
             "threshold": threshold,
             "horizon_seconds": 120,
             "trained_through": str(
-                training["game_date"].max()
+                validation["game_date"].max()
             ),
             "metrics": metrics,
         },
