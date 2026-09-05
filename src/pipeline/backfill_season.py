@@ -184,6 +184,7 @@ def main() -> None:
                 break
 
             if not args.force and game_is_complete(game_id):
+                clear_failure(game_id)
                 print(f"Skipping completed game {game_id}")
                 skipped += 1
                 continue

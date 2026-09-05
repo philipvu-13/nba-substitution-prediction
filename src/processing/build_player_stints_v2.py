@@ -95,6 +95,7 @@ def get_substitution_snapshots(events, team_id: int):
 
         snapshots[key[0]].append({
             "game_second": event_game_second(key[0], key[1]),
+            "seconds_remaining": key[1],
             "lineup": lineup,
         })
 
@@ -156,8 +157,11 @@ def build_stints(events, team_id: int):
         if open_stint is None:
             raise ValueError(f"Player {player_id} has no open stint")
 
-        if game_second <= open_stint["start"]:
+        if game_second < open_stint["start"]:
             raise ValueError(f"Invalid stint length for player {player_id}")
+
+        if game_second == open_stint["start"]:
+            return
 
         completed_stints.append({
             "team_id": team_id,
@@ -183,6 +187,9 @@ def build_stints(events, team_id: int):
         change_lineup(period_starters[period], period_start)
 
         for snapshot in substitution_snapshots.get(period, []):
+            if snapshot["seconds_remaining"] <= 0:
+                continue
+
             change_lineup(
                 snapshot["lineup"],
                 snapshot["game_second"],
