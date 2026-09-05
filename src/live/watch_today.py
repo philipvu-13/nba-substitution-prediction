@@ -1,6 +1,6 @@
 import argparse
 import time
-from datetime import date
+from datetime import date, datetime, timezone
 
 from src.config import get_connection
 from src.live.find_game import (
@@ -13,6 +13,9 @@ from src.live.poll_game import poll_game
 SCHEDULED_STATUS = 1
 LIVE_STATUS = 2
 FINAL_STATUS = 3
+
+PRE_GAME_WINDOW_SECONDS = 15 * 60
+MAX_SCHEDULED_SLEEP_SECONDS = 60 * 60
 
 
 def get_season_start_year(game_date):
@@ -120,6 +123,69 @@ def register_game(game):
         connection.close()
 
 
+def parse_game_time_utc(game_time_text):
+    cleaned = str(game_time_text).strip()
+
+    if cleaned.endswith("Z"):
+        cleaned = cleaned[:-1] + "+00:00"
+
+    game_time = datetime.fromisoformat(cleaned)
+
+    if game_time.tzinfo is None:
+        game_time = game_time.replace(
+            tzinfo=timezone.utc
+        )
+
+    return game_time.astimezone(timezone.utc)
+
+
+def calculate_scoreboard_wait(
+    game,
+    regular_interval,
+):
+    if game["game_status"] != SCHEDULED_STATUS:
+        return regular_interval
+
+    try:
+        game_time = parse_game_time_utc(
+            game["game_time_utc"]
+        )
+    except (TypeError, ValueError):
+        return regular_interval
+
+    seconds_until_game = (
+        game_time - datetime.now(timezone.utc)
+    ).total_seconds()
+
+    if seconds_until_game <= PRE_GAME_WINDOW_SECONDS:
+        return regular_interval
+
+    sleep_seconds = (
+        seconds_until_game
+        - PRE_GAME_WINDOW_SECONDS
+    )
+
+    return max(
+        regular_interval,
+        min(
+            round(sleep_seconds),
+            MAX_SCHEDULED_SLEEP_SECONDS,
+        ),
+    )
+
+
+def format_wait_time(seconds):
+    if seconds >= 3600:
+        hours = seconds / 3600
+        return f"{hours:.1f} hours"
+
+    if seconds >= 60:
+        minutes = seconds / 60
+        return f"{minutes:.1f} minutes"
+
+    return f"{seconds} seconds"
+
+
 def watch_game_day(
     game_date,
     scoreboard_interval,
@@ -185,18 +251,26 @@ def watch_game_day(
                 print("Game is already finished.")
                 return
 
+            wait_seconds = calculate_scoreboard_wait(
+                game,
+                scoreboard_interval,
+            )
+
             if game["game_status"] == SCHEDULED_STATUS:
                 print(
-                    f"Game has not started. Checking again "
-                    f"in {scoreboard_interval} seconds."
+                    "Game has not started. "
+                    f"Checking again in "
+                    f"{format_wait_time(wait_seconds)}."
                 )
             else:
                 print(
                     f"Unknown game status "
-                    f"{game['game_status']}. Checking again."
+                    f"{game['game_status']}. "
+                    f"Checking again in "
+                    f"{format_wait_time(wait_seconds)}."
                 )
 
-            time.sleep(scoreboard_interval)
+            time.sleep(wait_seconds)
 
     except KeyboardInterrupt:
         print("\nGame day watcher stopped by user.")
@@ -218,7 +292,7 @@ def main():
         "--scoreboard-interval",
         type=int,
         default=60,
-        help="Seconds between scoreboard checks",
+        help="Seconds between nearby scoreboard checks",
     )
 
     parser.add_argument(
