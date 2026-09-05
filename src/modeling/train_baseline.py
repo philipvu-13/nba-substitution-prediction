@@ -27,6 +27,8 @@ NUMERIC_FEATURES = [
     "started_period",
     "started_game",
     "is_home",
+    "score_diff",
+    "abs_score_diff",
 ]
 
 CATEGORICAL_FEATURES = [
@@ -58,8 +60,9 @@ def load_dataset() -> pd.DataFrame:
                     started_period,
                     started_game,
                     is_home,
+                    score_diff,
                     exits_within_120_seconds
-                FROM analytics.substitution_training_examples_v
+                FROM analytics.substitution_training_context_v
                 ORDER BY game_date, game_id, snapshot_game_second
                 """
             )
@@ -74,6 +77,7 @@ def load_dataset() -> pd.DataFrame:
 
     dataset = pd.DataFrame(rows, columns=columns)
     dataset["player_id"] = dataset["player_id"].astype(str)
+    dataset["abs_score_diff"] = dataset["score_diff"].abs()
 
     return dataset
 
