@@ -269,7 +269,7 @@ def poll_game(
 
                 if game_is_finished(state):
                     print("\nGame finished. Polling stopped.")
-                    return
+                    return True
 
             except Exception as error:
                 print(
@@ -282,6 +282,7 @@ def poll_game(
 
     except KeyboardInterrupt:
         print("\nPolling stopped by user.")
+        return False
 
 
 def main():

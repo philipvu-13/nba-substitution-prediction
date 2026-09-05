@@ -1,4 +1,6 @@
 import argparse
+import subprocess
+import sys
 import time
 from datetime import date, datetime, timezone
 
@@ -7,6 +9,7 @@ from src.live.find_game import (
     find_wolves_game,
     get_central_date,
 )
+from src.live.grade_game import grade_game
 from src.live.poll_game import poll_game
 
 
@@ -16,6 +19,9 @@ FINAL_STATUS = 3
 
 PRE_GAME_WINDOW_SECONDS = 15 * 60
 MAX_SCHEDULED_SLEEP_SECONDS = 60 * 60
+
+POSTGAME_ATTEMPTS = 10
+POSTGAME_RETRY_SECONDS = 60
 
 
 def get_season_start_year(game_date):
@@ -121,6 +127,88 @@ def register_game(game):
 
     finally:
         connection.close()
+
+
+def stored_predictions_exist(game_id):
+    connection = get_connection()
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM analytics.live_predictions
+                    WHERE game_id = %s
+                );
+                """,
+                (game_id,),
+            )
+
+            return bool(cursor.fetchone()[0])
+
+    finally:
+        connection.close()
+
+
+def run_final_pipeline(game_id):
+    subprocess.run(
+        [
+            sys.executable,
+            "-u",
+            "-m",
+            "src.pipeline.run_game",
+            game_id,
+        ],
+        check=True,
+    )
+
+
+def finalize_game(game_id):
+    if not stored_predictions_exist(game_id):
+        print(
+            "\nNo stored live predictions were found. "
+            "Skipping postgame grading."
+        )
+        return
+
+    print("\nStarting postgame processing.")
+
+    for attempt in range(
+        1,
+        POSTGAME_ATTEMPTS + 1,
+    ):
+        try:
+            print(
+                f"\nPostgame attempt "
+                f"{attempt}/{POSTGAME_ATTEMPTS}"
+            )
+
+            run_final_pipeline(game_id)
+
+            print("\nGrading stored predictions.")
+            grade_game(game_id)
+
+            print("\nPostgame processing completed.")
+            return
+
+        except Exception as error:
+            print(
+                f"\nPostgame processing failed: {error}"
+            )
+
+            if attempt == POSTGAME_ATTEMPTS:
+                raise RuntimeError(
+                    "Postgame processing failed after "
+                    f"{POSTGAME_ATTEMPTS} attempts"
+                ) from error
+
+            print(
+                f"Trying again in "
+                f"{POSTGAME_RETRY_SECONDS} seconds."
+            )
+
+            time.sleep(POSTGAME_RETRY_SECONDS)
 
 
 def parse_game_time_utc(game_time_text):
@@ -239,16 +327,31 @@ def watch_game_day(
             if game["game_status"] == LIVE_STATUS:
                 print("\nGame is live. Starting predictions.")
 
-                poll_game(
+                game_finished = poll_game(
                     game["game_id"],
                     game_interval,
                     discord_enabled,
                 )
 
+                if game_finished:
+                    finalize_game(
+                        game["game_id"]
+                    )
+                else:
+                    print(
+                        "\nLive polling stopped before "
+                        "the game finished."
+                    )
+
                 return
 
             if game["game_status"] == FINAL_STATUS:
                 print("Game is already finished.")
+
+                finalize_game(
+                    game["game_id"]
+                )
+
                 return
 
             wait_seconds = calculate_scoreboard_wait(
