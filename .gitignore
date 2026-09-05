@@ -5,3 +5,7 @@ data/raw/
 data/processed/
 *.csv
 *.db
+logs/
+*.log
+cache/
+.cache/
