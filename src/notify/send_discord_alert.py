@@ -56,7 +56,9 @@ def send_discord_alert(state, prediction):
                         "name": "Game Clock",
                         "value": (
                             f"Q{state['period']} "
-                            f"{format_clock(state['seconds_remaining'])}"
+                            f"{format_clock(
+                                state['seconds_remaining']
+                            )}"
                         ),
                         "inline": True,
                     },
@@ -69,21 +71,7 @@ def send_discord_alert(state, prediction):
                         ),
                         "inline": True,
                     },
-                    {
-                        "name": "Current Stint",
-                        "value": format_clock(
-                            top_prediction[
-                                "current_stint_seconds"
-                            ]
-                        ),
-                        "inline": True,
-                    },
                 ],
-                "footer": {
-                    "text": (
-                        "NBA substitution prediction V2"
-                    )
-                },
             }
         ]
     }
@@ -98,7 +86,7 @@ def send_test_notification():
                 "title": "Discord Connection Successful",
                 "description": (
                     "The NBA substitution prediction project "
-                    "can now send live alerts."
+                    "can send live alerts."
                 ),
                 "color": 5763719,
             }

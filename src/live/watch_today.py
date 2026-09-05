@@ -11,6 +11,9 @@ from src.live.find_game import (
 )
 from src.live.grade_game import grade_game
 from src.live.poll_game import poll_game
+from src.notify.send_discord_postgame import (
+    send_discord_postgame_summary,
+)
 
 
 SCHEDULED_STATUS = 1
@@ -164,7 +167,10 @@ def run_final_pipeline(game_id):
     )
 
 
-def finalize_game(game_id):
+def finalize_game(
+    game_id,
+    discord_enabled,
+):
     if not stored_predictions_exist(game_id):
         print(
             "\nNo stored live predictions were found. "
@@ -188,6 +194,21 @@ def finalize_game(game_id):
 
             print("\nGrading stored predictions.")
             grade_game(game_id)
+
+            if discord_enabled:
+                print(
+                    "\nSending postgame report to Discord."
+                )
+
+                try:
+                    send_discord_postgame_summary(
+                        game_id
+                    )
+                except Exception as error:
+                    print(
+                        "Discord postgame summary failed: "
+                        f"{error}"
+                    )
 
             print("\nPostgame processing completed.")
             return
@@ -335,7 +356,8 @@ def watch_game_day(
 
                 if game_finished:
                     finalize_game(
-                        game["game_id"]
+                        game["game_id"],
+                        discord_enabled,
                     )
                 else:
                     print(
@@ -349,7 +371,8 @@ def watch_game_day(
                 print("Game is already finished.")
 
                 finalize_game(
-                    game["game_id"]
+                    game["game_id"],
+                    discord_enabled,
                 )
 
                 return
@@ -408,7 +431,7 @@ def main():
     parser.add_argument(
         "--discord",
         action="store_true",
-        help="Send approved alerts to Discord",
+        help="Send live alerts and the postgame report to Discord",
     )
 
     args = parser.parse_args()
