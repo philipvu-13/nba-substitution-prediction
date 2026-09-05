@@ -61,8 +61,9 @@ def load_dataset() -> pd.DataFrame:
                     started_game,
                     is_home,
                     score_diff,
-                    exits_within_120_seconds
-                FROM analytics.substitution_training_context_v
+                    exits_within_120_seconds,
+                    exits_within_60_seconds
+                FROM analytics.substitution_live_training_v
                 ORDER BY game_date, game_id, snapshot_game_second
                 """
             )

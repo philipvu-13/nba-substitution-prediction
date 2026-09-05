@@ -7,9 +7,7 @@ import pandas as pd
 from src.config import get_connection
 
 
-MODEL_PATH = Path(
-    "models/substitution_logistic_validated.joblib"
-)
+MODEL_PATH = Path("models/substitution_live_v1.joblib")
 
 
 def parse_clock(clock: str) -> int:
@@ -51,8 +49,6 @@ def get_snapshot_second(period: int, clock: str) -> int:
         - seconds_remaining
     )
 
-    # Use the most recent 30-second snapshot,
-    # never a snapshot from the future.
     return (exact_game_second // 30) * 30
 
 
@@ -78,8 +74,8 @@ def load_snapshot(game_id: str, snapshot_second: int):
                     started_game,
                     is_home,
                     score_diff,
-                    exits_within_120_seconds
-                FROM analytics.substitution_training_context_v
+                    exits_within_60_seconds
+                FROM analytics.substitution_live_training_v
                 WHERE game_id = %s
                   AND snapshot_game_second = %s
                 ORDER BY player_name
@@ -112,7 +108,7 @@ def main():
 
     if not MODEL_PATH.exists():
         raise FileNotFoundError(
-            "Run the validated model training script first"
+            "Run train_live_model before making predictions"
         )
 
     snapshot_second = get_snapshot_second(
@@ -127,7 +123,7 @@ def main():
 
     if snapshot.empty:
         raise ValueError(
-            "No training snapshot exists for that game and clock"
+            "No snapshot exists for that game and clock"
         )
 
     if len(snapshot) != 5:
@@ -136,9 +132,11 @@ def main():
         )
 
     artifact = joblib.load(MODEL_PATH)
+
     model = artifact["model"]
     features = artifact["features"]
-    threshold = artifact["threshold"]
+    threshold = artifact["snapshot_threshold"]
+    horizon = artifact["horizon_seconds"]
 
     snapshot["player_id"] = snapshot["player_id"].astype(str)
     snapshot["abs_score_diff"] = snapshot["score_diff"].abs()
@@ -147,39 +145,55 @@ def main():
         snapshot[features]
     )[:, 1]
 
-    snapshot["alert"] = (
-        snapshot["probability"] >= threshold
-    )
-
     snapshot = snapshot.sort_values(
         "probability",
         ascending=False,
     ).reset_index(drop=True)
 
-    first_row = snapshot.iloc[0]
+    top_player = snapshot.iloc[0]
 
-    location = "vs" if first_row["is_home"] else "at"
+    substitution_likely = (
+        top_player["probability"] >= threshold
+    )
 
-    print(
-        f"\n{first_row['game_date']} "
-        f"{location} {first_row['opponent']}"
+    location = (
+        "vs"
+        if top_player["is_home"]
+        else "at"
     )
 
     print(
-        f"Q{first_row['period']} "
-        f"with {format_seconds(first_row['seconds_remaining'])} "
+        f"\n{top_player['game_date']} "
+        f"{location} {top_player['opponent']}"
+    )
+
+    print(
+        f"Q{top_player['period']} with "
+        f"{format_seconds(top_player['seconds_remaining'])} "
         f"remaining"
     )
 
-    print(f"Score difference: {first_row['score_diff']:+d}")
-    print(f"Alert threshold: {threshold:.0%}\n")
+    print(f"Score difference: {top_player['score_diff']:+d}")
+
+    print(
+        f"\nSubstitution likely within "
+        f"{horizon} seconds: "
+        f"{'YES' if substitution_likely else 'NO'}"
+    )
+
+    print(
+        f"Most likely player: "
+        f"{top_player['player_name']} "
+        f"({top_player['probability']:.1%})"
+    )
+
+    print(f"Required threshold: {threshold:.0%}\n")
 
     print(
         f"{'Rank':<6}"
         f"{'Player':<24}"
         f"{'Probability':<14}"
         f"{'Current stint':<16}"
-        f"{'Alert':<8}"
         f"{'Actually exited'}"
     )
 
@@ -189,8 +203,7 @@ def main():
             f"{row['player_name']:<24}"
             f"{row['probability']:<14.1%}"
             f"{format_seconds(row['current_stint_seconds']):<16}"
-            f"{str(bool(row['alert'])):<8}"
-            f"{bool(row['exits_within_120_seconds'])}"
+            f"{bool(row['exits_within_60_seconds'])}"
         )
 
 
