@@ -1,0 +1,11 @@
+[Unit]
+Description=Start the NBA substitution watcher daily and after boot
+
+[Timer]
+OnBootSec=2min
+OnCalendar=*-*-* 09:00:00
+Persistent=true
+Unit=nba-substitution-live.service
+
+[Install]
+WantedBy=timers.target
