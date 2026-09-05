@@ -9,6 +9,7 @@ from src.live.predict_live import (
     predict_state,
     print_prediction,
 )
+from src.live.prediction_store import save_prediction
 from src.live.read_state import (
     build_state,
     event_game_second,
@@ -60,7 +61,7 @@ def process_alert(
 ):
     if not prediction["should_alert"]:
         print("\nAlert status: Threshold not reached")
-        return False
+        return "below_threshold"
 
     top_prediction = prediction["top_prediction"]
 
@@ -80,7 +81,7 @@ def process_alert(
 
     if not alert_allowed:
         print(f"\nAlert suppressed: {reason}")
-        return False
+        return "cooldown_suppressed"
 
     print("\nALERT READY")
     print(
@@ -98,18 +99,37 @@ def process_alert(
             )
         except Exception as error:
             print(f"Discord alert failed: {error}")
-            return False
+            return "discord_failed"
 
         print("Discord alert sent.")
+        alert_status = "discord_sent"
     else:
         print("Discord delivery disabled.")
+        alert_status = "dry_run_alert"
 
     alert_memory.record_alert(
         player_id,
         game_second,
     )
 
-    return True
+    return alert_status
+
+
+def store_prediction(
+    state,
+    prediction,
+    alert_status,
+):
+    prediction_id = save_prediction(
+        state,
+        prediction,
+        alert_status,
+    )
+
+    print(
+        f"Stored prediction {prediction_id} "
+        f"in PostgreSQL."
+    )
 
 
 def run_once(
@@ -117,6 +137,7 @@ def run_once(
     model_artifact,
     alert_memory,
     discord_enabled,
+    store_enabled,
     period=None,
     clock_seconds=None,
 ):
@@ -148,12 +169,19 @@ def run_once(
         prediction,
     )
 
-    process_alert(
+    alert_status = process_alert(
         state,
         prediction,
         alert_memory,
         discord_enabled,
     )
+
+    if store_enabled:
+        store_prediction(
+            state,
+            prediction,
+            alert_status,
+        )
 
     return state
 
@@ -183,6 +211,7 @@ def poll_game(
         + ("enabled" if discord_enabled else "disabled")
     )
 
+    print("PostgreSQL storage: enabled")
     print("Press Ctrl+C to stop.\n")
 
     try:
@@ -205,11 +234,17 @@ def poll_game(
                             prediction,
                         )
 
-                        process_alert(
+                        alert_status = process_alert(
                             state,
                             prediction,
                             alert_memory,
                             discord_enabled,
+                        )
+
+                        store_prediction(
+                            state,
+                            prediction,
+                            alert_status,
                         )
 
                     else:
@@ -232,7 +267,7 @@ def poll_game(
 
             except Exception as error:
                 print(
-                    f"Could not read the current game state: "
+                    f"Could not process the current game state: "
                     f"{error}"
                 )
                 print("Trying again on the next check.")
@@ -263,6 +298,12 @@ def main():
         help="Send approved alerts to Discord",
     )
 
+    parser.add_argument(
+        "--store",
+        action="store_true",
+        help="Store a historical snapshot test",
+    )
+
     parser.add_argument("--period", type=int)
     parser.add_argument("--clock")
 
@@ -290,6 +331,7 @@ def main():
             model_artifact,
             alert_memory,
             args.discord,
+            args.store,
             period=args.period,
             clock_seconds=parse_clock(args.clock),
         )
