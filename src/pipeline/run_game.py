@@ -15,7 +15,7 @@ PIPELINE_STAGES = [
 
 
 def run_stage(label: str, module: str, game_id: str) -> None:
-    print(f"\nRunning: {label}")
+    print(f"\nRunning: {label}", flush=True)
 
     subprocess.run(
         [sys.executable, "-m", module, game_id],
