@@ -3,6 +3,7 @@ import time
 
 import joblib
 
+from src.live.alert_memory import AlertMemory
 from src.live.predict_live import (
     MODEL_PATH,
     predict_state,
@@ -10,6 +11,7 @@ from src.live.predict_live import (
 )
 from src.live.read_state import (
     build_state,
+    event_game_second,
     parse_clock,
 )
 
@@ -47,9 +49,51 @@ def can_make_prediction(state):
     )
 
 
+def process_alert(state, prediction, alert_memory):
+    if not prediction["should_alert"]:
+        print("\nAlert status: Threshold not reached")
+        return False
+
+    top_prediction = prediction["top_prediction"]
+
+    player_id = int(top_prediction["player_id"])
+    player_name = top_prediction["player_name"]
+    probability = float(top_prediction["probability"])
+
+    game_second = event_game_second(
+        state["period"],
+        state["seconds_remaining"],
+    )
+
+    alert_allowed, reason = alert_memory.can_alert(
+        player_id,
+        game_second,
+    )
+
+    if not alert_allowed:
+        print(f"\nAlert suppressed: {reason}")
+        return False
+
+    alert_memory.record_alert(
+        player_id,
+        game_second,
+    )
+
+    print("\nALERT READY")
+    print(
+        f"Substitution likely within "
+        f"{prediction['horizon_seconds']} seconds"
+    )
+    print(f"Most likely player: {player_name}")
+    print(f"Probability: {probability:.1%}")
+
+    return True
+
+
 def run_once(
     game_id,
     model_artifact,
+    alert_memory,
     period=None,
     clock_seconds=None,
 ):
@@ -81,6 +125,12 @@ def run_once(
         prediction,
     )
 
+    process_alert(
+        state,
+        prediction,
+        alert_memory,
+    )
+
     return state
 
 
@@ -91,6 +141,7 @@ def poll_game(game_id, interval_seconds):
         )
 
     model_artifact = joblib.load(MODEL_PATH)
+    alert_memory = AlertMemory()
     previous_state_key = None
 
     print(f"Watching game {game_id}")
@@ -119,6 +170,13 @@ def poll_game(game_id, interval_seconds):
                             state,
                             prediction,
                         )
+
+                        process_alert(
+                            state,
+                            prediction,
+                            alert_memory,
+                        )
+
                     else:
                         print(
                             f"Q{state['period']} has "
@@ -183,11 +241,13 @@ def main():
         )
 
     model_artifact = joblib.load(MODEL_PATH)
+    alert_memory = AlertMemory()
 
     if args.period is not None:
         run_once(
             args.game_id,
             model_artifact,
+            alert_memory,
             period=args.period,
             clock_seconds=parse_clock(args.clock),
         )
