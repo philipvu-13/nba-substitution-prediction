@@ -14,6 +14,9 @@ from src.live.read_state import (
     event_game_second,
     parse_clock,
 )
+from src.notify.send_discord_alert import (
+    send_discord_alert,
+)
 
 
 MINIMUM_SECONDS_REMAINING = 120
@@ -49,7 +52,12 @@ def can_make_prediction(state):
     )
 
 
-def process_alert(state, prediction, alert_memory):
+def process_alert(
+    state,
+    prediction,
+    alert_memory,
+    discord_enabled,
+):
     if not prediction["should_alert"]:
         print("\nAlert status: Threshold not reached")
         return False
@@ -74,11 +82,6 @@ def process_alert(state, prediction, alert_memory):
         print(f"\nAlert suppressed: {reason}")
         return False
 
-    alert_memory.record_alert(
-        player_id,
-        game_second,
-    )
-
     print("\nALERT READY")
     print(
         f"Substitution likely within "
@@ -87,6 +90,25 @@ def process_alert(state, prediction, alert_memory):
     print(f"Most likely player: {player_name}")
     print(f"Probability: {probability:.1%}")
 
+    if discord_enabled:
+        try:
+            send_discord_alert(
+                state,
+                prediction,
+            )
+        except Exception as error:
+            print(f"Discord alert failed: {error}")
+            return False
+
+        print("Discord alert sent.")
+    else:
+        print("Discord delivery disabled.")
+
+    alert_memory.record_alert(
+        player_id,
+        game_second,
+    )
+
     return True
 
 
@@ -94,6 +116,7 @@ def run_once(
     game_id,
     model_artifact,
     alert_memory,
+    discord_enabled,
     period=None,
     clock_seconds=None,
 ):
@@ -129,12 +152,17 @@ def run_once(
         state,
         prediction,
         alert_memory,
+        discord_enabled,
     )
 
     return state
 
 
-def poll_game(game_id, interval_seconds):
+def poll_game(
+    game_id,
+    interval_seconds,
+    discord_enabled,
+):
     if not MODEL_PATH.exists():
         raise FileNotFoundError(
             f"Model not found at {MODEL_PATH}"
@@ -149,6 +177,12 @@ def poll_game(game_id, interval_seconds):
         f"Checking for new events every "
         f"{interval_seconds} seconds"
     )
+
+    print(
+        "Discord alerts: "
+        + ("enabled" if discord_enabled else "disabled")
+    )
+
     print("Press Ctrl+C to stop.\n")
 
     try:
@@ -175,6 +209,7 @@ def poll_game(game_id, interval_seconds):
                             state,
                             prediction,
                             alert_memory,
+                            discord_enabled,
                         )
 
                     else:
@@ -222,6 +257,12 @@ def main():
         help="Seconds between live feed checks",
     )
 
+    parser.add_argument(
+        "--discord",
+        action="store_true",
+        help="Send approved alerts to Discord",
+    )
+
     parser.add_argument("--period", type=int)
     parser.add_argument("--clock")
 
@@ -248,6 +289,7 @@ def main():
             args.game_id,
             model_artifact,
             alert_memory,
+            args.discord,
             period=args.period,
             clock_seconds=parse_clock(args.clock),
         )
@@ -256,6 +298,7 @@ def main():
     poll_game(
         args.game_id,
         args.interval,
+        args.discord,
     )
 
 
