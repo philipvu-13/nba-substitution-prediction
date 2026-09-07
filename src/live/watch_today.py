@@ -5,6 +5,9 @@ import time
 from datetime import date, datetime, timezone
 
 from src.config import get_connection
+from src.content.postgame_rotation_post import (
+    generate_postgame_rotation_post,
+)
 from src.live.find_game import (
     find_wolves_game,
     get_central_date,
@@ -13,9 +16,6 @@ from src.live.grade_game import grade_game
 from src.live.poll_game import poll_game
 from src.notify.send_discord_postgame import (
     send_discord_postgame_summary,
-)
-from src.visualization.rotation_timeline import (
-    generate_rotation_timeline,
 )
 
 
@@ -170,32 +170,45 @@ def run_final_pipeline(game_id):
     )
 
 
-def create_postgame_timeline(game_id):
+def create_postgame_content(game_id):
     try:
-        print("\nGenerating rotation timeline.")
+        print(
+            "\nGenerating rotation timeline "
+            "and X caption."
+        )
 
-        output_path = generate_rotation_timeline(
+        result = generate_postgame_rotation_post(
             game_id
         )
 
         print(
             f"Created rotation timeline: "
-            f"{output_path}"
+            f"{result['graphic_path']}"
         )
 
-        return output_path
+        print(
+            f"Created X caption: "
+            f"{result['caption_path']}"
+        )
+
+        return result
 
     except Exception as error:
         print(
-            f"Rotation timeline creation failed: "
+            f"Postgame content creation failed: "
             f"{error}"
         )
 
         print(
-            "Continuing without a postgame graphic."
+            "Continuing without postgame "
+            "social content."
         )
 
-        return None
+        return {
+            "caption": None,
+            "caption_path": None,
+            "graphic_path": None,
+        }
 
 
 def finalize_game(
@@ -226,8 +239,8 @@ def finalize_game(
             print("\nGrading stored predictions.")
             grade_game(game_id)
 
-            timeline_path = (
-                create_postgame_timeline(game_id)
+            postgame_content = (
+                create_postgame_content(game_id)
             )
 
             if discord_enabled:
@@ -239,7 +252,12 @@ def finalize_game(
                 try:
                     send_discord_postgame_summary(
                         game_id,
-                        image_path=timeline_path,
+                        image_path=postgame_content[
+                            "graphic_path"
+                        ],
+                        suggested_caption=postgame_content[
+                            "caption"
+                        ],
                     )
 
                 except Exception as error:

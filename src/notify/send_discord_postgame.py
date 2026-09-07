@@ -4,12 +4,6 @@ from src.config import get_connection
 from src.notify.send_discord_alert import post_to_discord
 
 
-DELIVERED_ALERT_STATUSES = (
-    "discord_sent",
-    "dry_run_alert",
-)
-
-
 def safe_percentage(numerator, denominator):
     if denominator == 0:
         return 0.0
@@ -115,6 +109,7 @@ def load_postgame_results(game_id):
 def send_discord_postgame_summary(
     game_id,
     image_path=None,
+    suggested_caption=None,
 ):
     results = load_postgame_results(game_id)
 
@@ -143,54 +138,63 @@ def send_discord_postgame_summary(
         )
         color = 5763719
 
+    fields = [
+        {
+            "name": "Game",
+            "value": results["matchup"],
+            "inline": True,
+        },
+        {
+            "name": "Date",
+            "value": str(results["game_date"]),
+            "inline": True,
+        },
+        {
+            "name": "Alerts Sent",
+            "value": str(delivered_alerts),
+            "inline": True,
+        },
+        {
+            "name": "Substitution Accuracy",
+            "value": (
+                f"{results[
+                    'correct_substitution_alerts'
+                ]}/{delivered_alerts} "
+                f"({substitution_precision:.1%})"
+            ),
+            "inline": True,
+        },
+        {
+            "name": "Exact Player Accuracy",
+            "value": (
+                f"{results[
+                    'correct_player_alerts'
+                ]}/{delivered_alerts} "
+                f"({player_precision:.1%})"
+            ),
+            "inline": True,
+        },
+        {
+            "name": "Stored Predictions",
+            "value": str(
+                results["stored_predictions"]
+            ),
+            "inline": True,
+        },
+    ]
+
+    if suggested_caption:
+        fields.append({
+            "name": "Suggested X Post",
+            "value": suggested_caption,
+            "inline": False,
+        })
+
     embed = {
         "title": "Timberwolves Postgame Report",
         "description": description,
         "color": color,
-        "fields": [
-            {
-                "name": "Game",
-                "value": results["matchup"],
-                "inline": True,
-            },
-            {
-                "name": "Date",
-                "value": str(results["game_date"]),
-                "inline": True,
-            },
-            {
-                "name": "Alerts Sent",
-                "value": str(delivered_alerts),
-                "inline": True,
-            },
-            {
-                "name": "Substitution Accuracy",
-                "value": (
-                    f"{results[
-                        'correct_substitution_alerts'
-                    ]}/{delivered_alerts} "
-                    f"({substitution_precision:.1%})"
-                ),
-                "inline": True,
-            },
-            {
-                "name": "Exact Player Accuracy",
-                "value": (
-                    f"{results[
-                        'correct_player_alerts'
-                    ]}/{delivered_alerts} "
-                    f"({player_precision:.1%})"
-                ),
-                "inline": True,
-            },
-            {
-                "name": "Stored Predictions",
-                "value": str(
-                    results["stored_predictions"]
-                ),
-                "inline": True,
-            },
-        ],
+        "fields": fields,
         "footer": {
             "text": (
                 f"Game ID {game_id} | "
