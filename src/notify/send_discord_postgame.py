@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from src.config import get_connection
 from src.notify.send_discord_alert import post_to_discord
 
@@ -100,7 +102,9 @@ def load_postgame_results(game_id):
                 "stored_predictions": int(row[2]),
                 "threshold_predictions": int(row[3]),
                 "delivered_alerts": int(row[4]),
-                "correct_substitution_alerts": int(row[5]),
+                "correct_substitution_alerts": int(
+                    row[5]
+                ),
                 "correct_player_alerts": int(row[6]),
             }
 
@@ -108,7 +112,10 @@ def load_postgame_results(game_id):
         connection.close()
 
 
-def send_discord_postgame_summary(game_id):
+def send_discord_postgame_summary(
+    game_id,
+    image_path=None,
+):
     results = load_postgame_results(game_id)
 
     delivered_alerts = results["delivered_alerts"]
@@ -125,76 +132,89 @@ def send_discord_postgame_summary(game_id):
 
     if delivered_alerts == 0:
         description = (
-            "The game finished, but no alerts were delivered."
+            "The game finished, but no alerts "
+            "were delivered."
         )
         color = 9807270
     else:
         description = (
-            "The live substitution predictions have "
-            "been graded."
+            "The live substitution predictions "
+            "have been graded."
         )
         color = 5763719
 
-    payload = {
-        "embeds": [
+    embed = {
+        "title": "Timberwolves Postgame Report",
+        "description": description,
+        "color": color,
+        "fields": [
             {
-                "title": "Timberwolves Postgame Report",
-                "description": description,
-                "color": color,
-                "fields": [
-                    {
-                        "name": "Game",
-                        "value": results["matchup"],
-                        "inline": True,
-                    },
-                    {
-                        "name": "Date",
-                        "value": str(results["game_date"]),
-                        "inline": True,
-                    },
-                    {
-                        "name": "Alerts Sent",
-                        "value": str(delivered_alerts),
-                        "inline": True,
-                    },
-                    {
-                        "name": "Substitution Accuracy",
-                        "value": (
-                            f"{results[
-                                'correct_substitution_alerts'
-                            ]}/{delivered_alerts} "
-                            f"({substitution_precision:.1%})"
-                        ),
-                        "inline": True,
-                    },
-                    {
-                        "name": "Exact Player Accuracy",
-                        "value": (
-                            f"{results[
-                                'correct_player_alerts'
-                            ]}/{delivered_alerts} "
-                            f"({player_precision:.1%})"
-                        ),
-                        "inline": True,
-                    },
-                    {
-                        "name": "Stored Predictions",
-                        "value": str(
-                            results["stored_predictions"]
-                        ),
-                        "inline": True,
-                    },
-                ],
-                "footer": {
-                    "text": (
-                        f"Game ID {game_id} | "
-                        "NBA substitution prediction V2"
-                    )
-                },
-            }
-        ]
+                "name": "Game",
+                "value": results["matchup"],
+                "inline": True,
+            },
+            {
+                "name": "Date",
+                "value": str(results["game_date"]),
+                "inline": True,
+            },
+            {
+                "name": "Alerts Sent",
+                "value": str(delivered_alerts),
+                "inline": True,
+            },
+            {
+                "name": "Substitution Accuracy",
+                "value": (
+                    f"{results[
+                        'correct_substitution_alerts'
+                    ]}/{delivered_alerts} "
+                    f"({substitution_precision:.1%})"
+                ),
+                "inline": True,
+            },
+            {
+                "name": "Exact Player Accuracy",
+                "value": (
+                    f"{results[
+                        'correct_player_alerts'
+                    ]}/{delivered_alerts} "
+                    f"({player_precision:.1%})"
+                ),
+                "inline": True,
+            },
+            {
+                "name": "Stored Predictions",
+                "value": str(
+                    results["stored_predictions"]
+                ),
+                "inline": True,
+            },
+        ],
+        "footer": {
+            "text": (
+                f"Game ID {game_id} | "
+                "NBA substitution prediction V2"
+            )
+        },
     }
 
-    post_to_discord(payload)
+    if image_path is not None:
+        image_path = Path(image_path)
+
+        embed["image"] = {
+            "url": (
+                f"attachment://{image_path.name}"
+            )
+        }
+
+    payload = {
+        "embeds": [embed],
+    }
+
+    post_to_discord(
+        payload,
+        image_path=image_path,
+    )
 
     print("Discord postgame summary sent.")

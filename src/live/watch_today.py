@@ -14,6 +14,9 @@ from src.live.poll_game import poll_game
 from src.notify.send_discord_postgame import (
     send_discord_postgame_summary,
 )
+from src.visualization.rotation_timeline import (
+    generate_rotation_timeline,
+)
 
 
 SCHEDULED_STATUS = 1
@@ -167,6 +170,34 @@ def run_final_pipeline(game_id):
     )
 
 
+def create_postgame_timeline(game_id):
+    try:
+        print("\nGenerating rotation timeline.")
+
+        output_path = generate_rotation_timeline(
+            game_id
+        )
+
+        print(
+            f"Created rotation timeline: "
+            f"{output_path}"
+        )
+
+        return output_path
+
+    except Exception as error:
+        print(
+            f"Rotation timeline creation failed: "
+            f"{error}"
+        )
+
+        print(
+            "Continuing without a postgame graphic."
+        )
+
+        return None
+
+
 def finalize_game(
     game_id,
     discord_enabled,
@@ -195,15 +226,22 @@ def finalize_game(
             print("\nGrading stored predictions.")
             grade_game(game_id)
 
+            timeline_path = (
+                create_postgame_timeline(game_id)
+            )
+
             if discord_enabled:
                 print(
-                    "\nSending postgame report to Discord."
+                    "\nSending postgame report "
+                    "to Discord."
                 )
 
                 try:
                     send_discord_postgame_summary(
-                        game_id
+                        game_id,
+                        image_path=timeline_path,
                     )
+
                 except Exception as error:
                     print(
                         "Discord postgame summary failed: "
@@ -331,11 +369,13 @@ def watch_game_day(
 
                 print(
                     f"Found {game['game_id']}: "
-                    f"MIN {location} {game['opponent']}"
+                    f"MIN {location} "
+                    f"{game['opponent']}"
                 )
 
                 print(
-                    f"Status: {game['game_status_text']}"
+                    f"Status: "
+                    f"{game['game_status_text']}"
                 )
 
                 print(
@@ -346,7 +386,10 @@ def watch_game_day(
                 previous_status = current_status
 
             if game["game_status"] == LIVE_STATUS:
-                print("\nGame is live. Starting predictions.")
+                print(
+                    "\nGame is live. "
+                    "Starting predictions."
+                )
 
                 game_finished = poll_game(
                     game["game_id"],
@@ -382,7 +425,10 @@ def watch_game_day(
                 scoreboard_interval,
             )
 
-            if game["game_status"] == SCHEDULED_STATUS:
+            if (
+                game["game_status"]
+                == SCHEDULED_STATUS
+            ):
                 print(
                     "Game has not started. "
                     f"Checking again in "
@@ -399,13 +445,16 @@ def watch_game_day(
             time.sleep(wait_seconds)
 
     except KeyboardInterrupt:
-        print("\nGame day watcher stopped by user.")
+        print(
+            "\nGame day watcher stopped by user."
+        )
 
 
 def main():
     parser = argparse.ArgumentParser(
         description=(
-            "Find and watch today's Timberwolves game"
+            "Find and watch today's "
+            "Timberwolves game"
         )
     )
 
@@ -418,32 +467,43 @@ def main():
         "--scoreboard-interval",
         type=int,
         default=60,
-        help="Seconds between nearby scoreboard checks",
+        help=(
+            "Seconds between nearby "
+            "scoreboard checks"
+        ),
     )
 
     parser.add_argument(
         "--game-interval",
         type=int,
         default=30,
-        help="Seconds between live prediction checks",
+        help=(
+            "Seconds between live "
+            "prediction checks"
+        ),
     )
 
     parser.add_argument(
         "--discord",
         action="store_true",
-        help="Send live alerts and the postgame report to Discord",
+        help=(
+            "Send live alerts and the "
+            "postgame report to Discord"
+        ),
     )
 
     args = parser.parse_args()
 
     if args.scoreboard_interval <= 0:
         parser.error(
-            "--scoreboard-interval must be greater than zero"
+            "--scoreboard-interval must be "
+            "greater than zero"
         )
 
     if args.game_interval <= 0:
         parser.error(
-            "--game-interval must be greater than zero"
+            "--game-interval must be "
+            "greater than zero"
         )
 
     game_date = (
