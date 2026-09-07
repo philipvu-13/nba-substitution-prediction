@@ -18,6 +18,10 @@ from src.live.read_state import (
 from src.notify.send_discord_alert import (
     send_discord_alert,
 )
+from src.visualization.live_probability import (
+    build_output_path,
+    create_live_probability_graphic,
+)
 
 
 MINIMUM_SECONDS_REMAINING = 120
@@ -53,7 +57,27 @@ def can_make_prediction(state):
     )
 
 
+def create_alert_graphic(
+    game_id,
+    state,
+    prediction,
+):
+    output_path = build_output_path(
+        game_id,
+        state,
+    )
+
+    create_live_probability_graphic(
+        state,
+        prediction,
+        output_path,
+    )
+
+    return output_path
+
+
 def process_alert(
+    game_id,
     state,
     prediction,
     alert_memory,
@@ -67,7 +91,9 @@ def process_alert(
 
     player_id = int(top_prediction["player_id"])
     player_name = top_prediction["player_name"]
-    probability = float(top_prediction["probability"])
+    probability = float(
+        top_prediction["probability"]
+    )
 
     game_second = event_game_second(
         state["period"],
@@ -84,25 +110,55 @@ def process_alert(
         return "cooldown_suppressed"
 
     print("\nALERT READY")
+
     print(
         f"Substitution likely within "
         f"{prediction['horizon_seconds']} seconds"
     )
+
     print(f"Most likely player: {player_name}")
     print(f"Probability: {probability:.1%}")
 
     if discord_enabled:
+        image_path = None
+
+        try:
+            image_path = create_alert_graphic(
+                game_id,
+                state,
+                prediction,
+            )
+
+            print(
+                f"Created alert graphic: "
+                f"{image_path}"
+            )
+
+        except Exception as error:
+            print(
+                f"Alert graphic creation failed: "
+                f"{error}"
+            )
+
+            print(
+                "Sending the Discord alert "
+                "without an image."
+            )
+
         try:
             send_discord_alert(
                 state,
                 prediction,
+                image_path=image_path,
             )
+
         except Exception as error:
             print(f"Discord alert failed: {error}")
             return "discord_failed"
 
         print("Discord alert sent.")
         alert_status = "discord_sent"
+
     else:
         print("Discord delivery disabled.")
         alert_status = "dry_run_alert"
@@ -151,8 +207,10 @@ def run_once(
     if not can_make_prediction(state):
         print(
             f"Q{state['period']} has "
-            f"{state['seconds_remaining']:.1f} seconds remaining."
+            f"{state['seconds_remaining']:.1f} "
+            f"seconds remaining."
         )
+
         print(
             "Skipping prediction because the model was "
             "not trained on the final two minutes."
@@ -171,6 +229,7 @@ def run_once(
     )
 
     alert_status = process_alert(
+        game_id,
         state,
         prediction,
         alert_memory,
@@ -206,6 +265,7 @@ def poll_game(
     previous_state_key = None
 
     print(f"Watching game {game_id}")
+
     print(
         f"Checking for new events every "
         f"{interval_seconds} seconds"
@@ -213,18 +273,35 @@ def poll_game(
 
     print(
         "Discord alerts: "
-        + ("enabled" if discord_enabled else "disabled")
+        + (
+            "enabled"
+            if discord_enabled
+            else "disabled"
+        )
     )
 
     print("PostgreSQL storage: enabled")
     print("Persistent alert cooldowns: enabled")
+
+    print(
+        "Discord alert graphics: "
+        + (
+            "enabled"
+            if discord_enabled
+            else "disabled"
+        )
+    )
+
     print("Press Ctrl+C to stop.\n")
 
     try:
         while True:
             try:
                 state = build_state(game_id)
-                current_state_key = build_state_key(state)
+
+                current_state_key = build_state_key(
+                    state
+                )
 
                 if current_state_key != previous_state_key:
                     print("\n" + "=" * 60)
@@ -241,6 +318,7 @@ def poll_game(
                         )
 
                         alert_status = process_alert(
+                            game_id,
                             state,
                             prediction,
                             alert_memory,
@@ -265,18 +343,27 @@ def poll_game(
                             "trained on the final two minutes."
                         )
 
-                    previous_state_key = current_state_key
+                    previous_state_key = (
+                        current_state_key
+                    )
 
                 if game_is_finished(state):
-                    print("\nGame finished. Polling stopped.")
+                    print(
+                        "\nGame finished. "
+                        "Polling stopped."
+                    )
+
                     return True
 
             except Exception as error:
                 print(
-                    f"Could not process the current game state: "
-                    f"{error}"
+                    f"Could not process the current "
+                    f"game state: {error}"
                 )
-                print("Trying again on the next check.")
+
+                print(
+                    "Trying again on the next check."
+                )
 
             time.sleep(interval_seconds)
 
@@ -287,7 +374,10 @@ def poll_game(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Continuously watch a game for substitutions"
+        description=(
+            "Continuously watch a game "
+            "for substitutions"
+        )
     )
 
     parser.add_argument("game_id")
@@ -317,7 +407,9 @@ def main():
     args = parser.parse_args()
 
     if args.interval <= 0:
-        parser.error("--interval must be greater than zero")
+        parser.error(
+            "--interval must be greater than zero"
+        )
 
     if (args.period is None) != (args.clock is None):
         parser.error(
@@ -341,8 +433,11 @@ def main():
             args.discord,
             args.store,
             period=args.period,
-            clock_seconds=parse_clock(args.clock),
+            clock_seconds=parse_clock(
+                args.clock
+            ),
         )
+
         return
 
     poll_game(
